@@ -62,15 +62,14 @@ npm run weekly                  # 수집 → 분석 → 엑셀 → 대시보드 
 - 신청함: 원문 URL이 같은 공고는 다음 주부터 목록에서 빠지고 `skipped_applied`로만 집계됩니다. 같은 이름의 다른 회차는 새 공고로 검토합니다.
 - 신청 안 함: 사유를 모아 `decline_insights`를 도출하고, 같은 패턴의 공고는 `추천 안함`으로 분류합니다.
 
-## 자동 실행 (GitHub Actions)
+## 운영 방식 두 가지
 
-`.github/workflows/weekly.yml`이 매주 금요일 09:00 KST에 실행됩니다.
+**A. 구독형 (API 키 없음, 현재 설정)**: 분석은 Claude 데스크톱 앱의 예약 작업이 구독으로 수행하고, 결과(`data/*.json`, `reports/*.html`)를 이 저장소에 푸시합니다. `.github/workflows/deploy.yml`은 `reports/`가 바뀔 때 GitHub Pages로 대시보드를 배포만 합니다. 저장소는 실제 판정 데이터가 올라가므로 **비공개**여야 합니다.
 
-1. 저장소 Settings → Secrets → `ANTHROPIC_API_KEY` 추가
-2. Settings → Pages → Source를 **GitHub Actions**로 설정
-3. Actions 탭에서 `weekly-scan`을 수동 실행(`workflow_dispatch`)해 첫 결과 확인
+1. Settings → Pages → Source를 **GitHub Actions**로 설정
+2. 앱 예약 작업이 매주 `node scripts/publish_repo.js`로 푸시 → 자동 배포
 
-실행 결과(`data/*.json`, `reports/index.html`)는 저장소에 커밋되고 대시보드는 GitHub Pages로 배포됩니다. 엑셀 파일은 Actions 아티팩트 대신 대시보드의 **엑셀 내보내기**로 받는 것을 권합니다(브라우저에서 생성).
+**B. API형 (서버에서 완전 자동)**: `npm run weekly`가 수집 → triage → 분석 → 엑셀까지 수행합니다. GitHub Actions cron으로 돌리려면 `ANTHROPIC_API_KEY` 시크릿을 넣고 이전 `weekly.yml`(git 이력에 있음)을 복원하면 됩니다. 종량 과금이며 토큰 절약 설계는 아래 표 참고.
 
 ## 다른 사이트에 붙이기
 

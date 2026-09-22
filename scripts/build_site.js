@@ -19,7 +19,8 @@ const weeks = files.map((f) => {
   return d;
 });
 
-const payload = JSON.stringify({ profile, weeks, built: new Date().toISOString() }).replace(/<\/script/gi, "<\\/script");
+const publicProfile = { ...profile }; delete publicProfile.finance;
+const payload = JSON.stringify({ profile: publicProfile, weeks, built: new Date().toISOString() }).replace(/<\/script/gi, "<\\/script");
 
 const html = `<title>SF 지원사업 검토판</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -273,6 +274,17 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     </div>
   </section>
 
+  <section id="declined-section">
+    <h2>추천에서 뺀 공고 <span id="declcount" style="color:var(--ink)"></span> <span style="color:var(--muted);font-weight:400">신청 안 함으로 표시한 공고 · 전체 주차</span></h2>
+    <div class="tablewrap">
+      <table class="grid" id="declined">
+        <thead><tr><th>주차</th><th>판정</th><th>공고명 / 기관</th><th>마감</th><th>점수</th><th>신청 안 함 사유</th><th>기록일</th><th>조건 확인 · 되돌리기</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="sub" id="applied-list" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
+  </section>
+
   <section class="internal" id="plan-section">
     <details>
       <summary><h2 style="display:inline-flex;margin:0;width:auto">향후 계획 <span style="color:var(--muted);font-weight:400">내부용 · PDF·엑셀에는 포함되지 않음</span></h2></summary>
@@ -429,8 +441,11 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     $('#xlsx').setAttribute('href', encodeURI(w.xlsx));
     $('#xlsxpath').textContent = (local ? '자동 생성본: ' : '자동 생성본 위치: ') + '지원사업\\\\reports\\\\' + w.xlsx;
 
-    const sorted = items.filter(isRec).sort(byScore);
-    $('#reccount').textContent = sorted.length ? '· ' + sorted.length + '건' : '';
+    const isDeclined = (it) => { const d = decisions[decKey(it)]; return !!(d && d.decision === 'declined'); };
+    const allRec = items.filter(isRec);
+    const sorted = allRec.filter(it => !isDeclined(it)).sort(byScore);
+    const declinedHere = allRec.length - sorted.length;
+    $('#reccount').textContent = (sorted.length ? '· ' + sorted.length + '건' : '') + (declinedHere ? ' (신청 안 함 ' + declinedHere + '건은 아래 "추천에서 뺀 공고"로 이동)' : '');
 
     // 분석 틀
     const fr = $('#frames'); fr.innerHTML = '';
@@ -481,7 +496,28 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     const sel = $('#fcat'); const keep = sel.value; sel.innerHTML = '<option value="">전체</option>' + cats.map(c => '<option' + (c === keep ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     renderAll();
     renderHist();
+    renderDeclined();
     setView(view);
+  }
+
+  function renderDeclined(){
+    const seen = new Map();
+    weeks.forEach((w) => { (w.items || []).forEach(it => { const k = decKey(it); const d = decisions[k]; if (!d) return; if (!seen.has(k)) seen.set(k, { it, d, week: w.report_date }); }); });
+    const rows = [...seen.values()].filter(x => x.d.decision === 'declined').sort((a, b) => (a.d.decided_at < b.d.decided_at ? 1 : -1));
+    const applied = [...seen.values()].filter(x => x.d.decision === 'applied').sort((a, b) => (a.d.decided_at < b.d.decided_at ? 1 : -1));
+    $('#declcount').textContent = rows.length ? '· ' + rows.length + '건' : '';
+    const tb = $('#declined tbody'); tb.innerHTML = '';
+    if (!rows.length) tb.innerHTML = '<tr><td colspan="8"><div class="empty">신청 안 함으로 표시한 공고가 없습니다. 추천 공고에서 "신청 안 함"을 누르면 여기로 모입니다.</div></td></tr>';
+    rows.forEach(({ it, d, week }) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td class="hist-week">' + esc(week) + '</td><td>' + recHtml(it.recommend) + '</td>' +
+        '<td class="title">' + esc(it.title) + '<div class="sub">' + esc(it.agency || '') + '</div></td><td class="num">' + esc(it.deadline || '-') + '</td><td class="num">' + esc(it.score ?? '-') + '</td>' +
+        '<td class="long" style="color:var(--ink)">' + esc(d.reason || '-') + '</td><td class="num">' + esc(d.decided_at || '') + '</td>' +
+        '<td class="decc"><div class="dec">' + (it.url ? '<a class="btn sm" href="' + esc(it.url) + '" target="_blank" rel="noopener">조건 확인 ↗</a>' : '') + (decAvail ? '<button type="button" class="btn sm" data-dec="clear" data-key="' + decKey(it) + '">추천으로 되돌리기</button>' : '') + '</div></td>';
+      keyIndex[decKey(it)] = it;
+      tb.appendChild(tr);
+    });
+    $('#applied-list').innerHTML = applied.length ? '<b style="color:var(--ink)">신청 완료 ' + applied.length + '건</b> (다음 주부터 같은 공고는 목록에서 제외): ' + applied.map(x => esc(x.it.title) + ' <span style="font-family:var(--mono)">' + esc(x.d.decided_at) + '</span>').join(' · ') : '';
   }
 
   function deadlineState(d){
