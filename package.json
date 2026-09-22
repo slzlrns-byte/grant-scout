@@ -1,0 +1,23 @@
+{
+  "name": "grant-scout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "정부·지자체 지원사업 공고를 매주 수집해 회사 조건과 대조하고, Claude로 타당성을 분석해 엑셀 보고서와 대시보드를 만드는 자동화 파이프라인",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "scan": "node scan/index.js",
+    "scan:dry": "node scan/index.js --dry-run",
+    "export": "node scripts/export_excel.js",
+    "site": "node scripts/build_site.js && node scripts/build_conditions.js",
+    "weekly": "node scan/index.js && node scripts/build_site.js && node scripts/build_conditions.js",
+    "demo": "node scripts/export_excel.js data/2026-09-21.json && node scripts/build_site.js && node scripts/build_conditions.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "exceljs": "^4.4.0",
+    "node-html-parser": "^9.0.4"
+  }
+}

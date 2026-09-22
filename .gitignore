@@ -1,0 +1,12 @@
+node_modules/
+.env
+data/_profile/
+data/_decisions/
+data/decisions_export.json
+reports/*.xlsx
+reports/*.pdf
+reports/*.csv
+*.log
+.DS_Store
+Thumbs.db
+data/_candidates/

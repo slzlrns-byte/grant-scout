@@ -1,0 +1,220 @@
+// 사용법: node scripts/build_conditions.js
+// config/company_profile.json 의 편집 가능 항목을 기본값으로 삼아 reports/conditions.html (회사 조건 관리 페이지)을 생성한다.
+// 페이지는 아티팩트 db(profile/company 문서)에 저장하고, 주간 스캔은 그 문서를 읽어 config 에 동기화한다.
+const fs = require("fs");
+const path = require("path");
+const ROOT = path.resolve(__dirname, "..");
+const p = JSON.parse(fs.readFileSync(path.join(ROOT, "config", "company_profile.json"), "utf8"));
+const KEYS = ["company_name", "industry", "business_type", "employees", "size_class", "location", "district", "founded_year", "interests", "certifications", "exclude_rules", "facts", "notes", "reporter", "department", "updated_at"];
+const defaults = {}; for (const k of KEYS) defaults[k] = p[k];
+const payload = JSON.stringify(defaults).replace(/<\/script/gi, "<\\/script");
+
+const html = `<title>SF 회사 조건 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#ffffff; --panel:#f3f3f3; --panel-2:#e9e9e9; --ink:#111111; --ink-2:#4a4a4a; --muted:#7a7a7a;
+  --line:#d9d9d9; --line-strong:#111111; --fill-hi:#111111; --on-hi:#ffffff;
+  --font:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --display:"Hahmlet","Noto Serif KR","Apple Myungjo","Batang",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#121212; --panel:#1d1d1d; --panel-2:#262626; --ink:#f2f2f2; --ink-2:#c4c4c4; --muted:#8a8a8a; --line:#333333; --line-strong:#f2f2f2; --fill-hi:#f2f2f2; --on-hi:#121212; }
+}
+:root[data-theme="dark"]{ --bg:#121212; --panel:#1d1d1d; --panel-2:#262626; --ink:#f2f2f2; --ink-2:#c4c4c4; --muted:#8a8a8a; --line:#333333; --line-strong:#f2f2f2; --fill-hi:#f2f2f2; --on-hi:#121212; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.55;padding:0 20px;padding-block:0 64px}
+.wrap{max-width:960px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-block:28px 18px;border-bottom:2px solid var(--line-strong)}
+.eyebrow{font-size:11.5px;letter-spacing:.03em;color:var(--muted);font-weight:500}
+h1{margin:4px 0 0;font-family:var(--display);font-size:28px;font-weight:600;text-wrap:balance}
+.lead{color:var(--ink-2);max-width:66ch;margin:14px 0 0}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:6px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);padding:8px 14px;font-size:13px;font-weight:500;background:var(--bg);color:var(--ink);cursor:pointer;font-family:inherit;line-height:1.2}
+.btn.primary{background:var(--fill-hi);color:var(--on-hi)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.status{font-size:12.5px;color:var(--muted);margin-left:auto}
+.status b{color:var(--ink);font-weight:500}
+section{margin-top:30px}
+h2{font-size:12.5px;letter-spacing:.03em;color:var(--muted);font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:10px}
+h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.help{font-size:12.5px;color:var(--muted);margin:-4px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 20px}
+.grid.three{grid-template-columns:repeat(3,1fr)}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+input,select,textarea{font:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);padding:8px 10px;width:100%}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ink);outline-offset:1px;border-color:var(--ink)}
+textarea{min-height:120px;resize:vertical;line-height:1.6}
+table{width:100%;border-collapse:collapse;border-top:2px solid var(--line-strong)}
+th{font-size:12px;letter-spacing:.02em;color:var(--muted);text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td input,td select{padding:6px 8px}
+.st{display:inline-flex;align-items:center;gap:6px}
+.st i{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--ink);display:inline-block}
+.st.own i{background:var(--ink)} .st.unk i{background:repeating-linear-gradient(45deg,var(--ink) 0 1.5px,transparent 1.5px 3px)} .st.no i{border-color:var(--muted)}
+.rm{appearance:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:4px 6px}
+.rm:hover{color:var(--ink)}
+.note{background:var(--panel);padding:12px 14px;font-size:13px;color:var(--ink-2);margin-top:12px}
+.note code{font-family:var(--mono);font-size:12px}
+footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+@media (max-width:720px){ .grid,.grid.three{grid-template-columns:1fr} h1{font-size:22px} .status{margin-left:0;width:100%} .hide-sm{display:none} }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">SpringNFlower · 총무 · 지원사업 스캔 기준</div>
+      <h1>회사 조건 관리</h1>
+    </div>
+    <div class="eyebrow" id="meta"></div>
+  </header>
+  <p class="lead">여기에 적힌 조건이 매주 금요일 지원사업 스캔의 판정 기준이 됩니다. 인증을 새로 받거나 관심 분야가 바뀌면 이 페이지에서 고치고 저장하세요. 다음 스캔부터 자동으로 반영됩니다.</p>
+
+  <div class="bar">
+    <button class="btn primary" id="save" type="button">저장</button>
+    <button class="btn" id="reset" type="button">마지막 저장본으로 되돌리기</button>
+    <button class="btn" id="copy" type="button">JSON 복사</button>
+    <button class="btn" id="dl" type="button" hidden>JSON 내려받기</button>
+    <span class="status" id="status">불러오는 중…</span>
+  </div>
+
+  <section>
+    <h2>기본 정보</h2>
+    <div class="grid three">
+      <label class="f">회사명<input id="company_name"></label>
+      <label class="f">업종 (요약)<input id="industry"></label>
+      <label class="f">업태 / 종목<input id="business_type"></label>
+      <label class="f">직원 수 (명)<input id="employees" type="number" min="1"></label>
+      <label class="f">기업 규모<select id="size_class"><option>중소기업</option><option>소기업</option><option>중견기업</option><option>소상공인</option></select></label>
+      <label class="f">설립연도<input id="founded_year" type="number" min="1900" max="2100"></label>
+      <label class="f">소재지 (시·도)<input id="location"></label>
+      <label class="f">구·동<input id="district"></label>
+      <label class="f">보고서 작성부서 / 작성자<div style="display:flex;gap:6px"><input id="department" placeholder="부서"><input id="reporter" placeholder="작성자"></div></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>인증 · 자격 보유 현황</h2>
+    <p class="help">인증이 필수 요건인 공고는 "보유"일 때만 신청 가능으로 봅니다. "미확인"은 확인 필요, "미보유"는 신청 불가로 판정합니다.</p>
+    <table id="certs"><thead><tr><th style="width:40%">인증 · 자격</th><th style="width:130px">상태</th><th>비고</th><th style="width:36px"></th></tr></thead><tbody></tbody></table>
+    <div style="margin-top:8px"><button class="btn" id="addcert" type="button">+ 항목 추가</button></div>
+  </section>
+
+  <section>
+    <h2>관심 분야 (찾고 싶은 지원)</h2>
+    <p class="help">한 줄에 하나. 점수의 "기대효과" 항목이 이 목록을 기준으로 매겨집니다.</p>
+    <textarea id="interests"></textarea>
+  </section>
+
+  <section>
+    <h2>제외 규칙</h2>
+    <p class="help">한 줄에 하나. 여기 적힌 유형은 점수와 관계없이 제외됩니다.</p>
+    <textarea id="exclude_rules"></textarea>
+  </section>
+
+  <section>
+    <h2>우리 회사에 대한 사실</h2>
+    <p class="help">한 줄에 하나. "우리는 ~이다"로 적을 수 있는 것 전부. 신청 자격 대조에 그대로 쓰입니다 (고용보험 성립일, 피보험자 수, 지사 유무, 재무 상태 등).</p>
+    <textarea id="facts"></textarea>
+  </section>
+
+  <section>
+    <h2>메모</h2>
+    <textarea id="notes" style="min-height:70px"></textarea>
+    <div class="note">저장하면 이 페이지의 데이터베이스에 기록되고, 매주 스캔이 시작될 때 프로젝트 폴더의 <code>config/company_profile.json</code>으로 복사됩니다. 재무제표 수치는 파일에서만 관리합니다.</div>
+  </section>
+
+  <footer>마지막 저장: <span id="saved">-</span></footer>
+</div>
+
+<script id="defaults" type="application/json">${payload}</script>
+<script>
+(function(){
+  const DEF = JSON.parse(document.getElementById('defaults').textContent);
+  const $ = (s) => document.querySelector(s);
+  const FIELDS = ['company_name','industry','business_type','employees','size_class','founded_year','location','district','department','reporter'];
+  const LISTS = ['interests','exclude_rules','facts'];
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let db = null, ref = null, last = DEF, dirty = false, saving = false, unsub = null, mode = null;
+  const LS = 'gs-profile';
+  const lsLoad = () => { try { const v = localStorage.getItem(LS); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
+  const lsSave = (d) => { try { localStorage.setItem(LS, JSON.stringify(d)); } catch (e) {} };
+  const download = (name, text) => { const b = new Blob([text], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); };
+
+  function setStatus(t, strong){ $('#status').innerHTML = strong ? '<b>' + esc(strong) + '</b> ' + esc(t) : esc(t); }
+  function markDirty(){ if (!dirty) { dirty = true; setStatus('저장되지 않은 변경이 있습니다.', '수정 중'); } }
+
+  function certRow(c){
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><input value="' + esc(c.name) + '" data-k="name" placeholder="인증명"></td>' +
+      '<td><select data-k="status"><option' + (c.status === '보유' ? ' selected' : '') + '>보유</option><option' + (c.status === '미보유' ? ' selected' : '') + '>미보유</option><option' + (c.status === '미확인' || !c.status ? ' selected' : '') + '>미확인</option></select></td>' +
+      '<td><input value="' + esc(c.note) + '" data-k="note" placeholder="확인일, 만료일 등"></td>' +
+      '<td><button class="rm" type="button" title="삭제" aria-label="삭제">×</button></td>';
+    tr.querySelector('.rm').addEventListener('click', () => { tr.remove(); markDirty(); });
+    tr.querySelectorAll('input,select').forEach(el => el.addEventListener('input', markDirty));
+    return tr;
+  }
+  function fill(d){
+    FIELDS.forEach(k => { $('#' + k).value = d[k] ?? ''; });
+    LISTS.forEach(k => { $('#' + k).value = (d[k] || []).join('\\n'); });
+    $('#notes').value = d.notes || '';
+    const tb = $('#certs tbody'); tb.innerHTML = '';
+    (d.certifications || []).forEach(c => tb.appendChild(certRow(c)));
+    $('#saved').textContent = d.updated_at || '-';
+    $('#meta').textContent = (d.company_name || '') + (d.updated_at ? ' · 기준일 ' + d.updated_at : '');
+    dirty = false;
+  }
+  function collect(){
+    const d = {};
+    FIELDS.forEach(k => { const v = $('#' + k).value.trim(); d[k] = (k === 'employees' || k === 'founded_year') ? (v === '' ? null : Number(v)) : v; });
+    LISTS.forEach(k => { d[k] = $('#' + k).value.split('\\n').map(s => s.trim()).filter(Boolean); });
+    d.notes = $('#notes').value.trim();
+    d.certifications = [...$('#certs tbody').querySelectorAll('tr')].map(tr => ({ name: tr.querySelector('[data-k=name]').value.trim(), status: tr.querySelector('[data-k=status]').value, note: tr.querySelector('[data-k=note]').value.trim() })).filter(c => c.name);
+    if (d.founded_year) d.business_age_years = new Date().getFullYear() - d.founded_year;
+    d.updated_at = new Date().toISOString().slice(0, 10);
+    return d;
+  }
+
+  fill(DEF);
+  document.querySelectorAll('input,select,textarea').forEach(el => el.addEventListener('input', markDirty));
+  $('#addcert').addEventListener('click', () => { $('#certs tbody').appendChild(certRow({ name: '', status: '미확인', note: '' })); markDirty(); });
+  $('#reset').addEventListener('click', () => { fill(last); setStatus('마지막 저장본으로 되돌렸습니다.'); });
+  $('#dl').addEventListener('click', () => { const d = collect(); lsSave(d); download('company_profile.json', JSON.stringify(d, null, 2)); setStatus('company_profile.json 을 내려받았습니다. config/ 폴더에 덮어쓰세요.'); });
+  $('#copy').addEventListener('click', async () => { const t = JSON.stringify(collect(), null, 2); try { await navigator.clipboard.writeText(t); setStatus('JSON을 클립보드에 복사했습니다.'); } catch (e) { window.prompt('아래 내용을 복사하세요', t); } });
+
+  $('#save').addEventListener('click', async () => {
+    if (!ref) { const d = collect(); lsSave(d); last = d; dirty = false; $('#saved').textContent = d.updated_at; setStatus('이 브라우저에 저장했습니다. "JSON 내려받기"로 받은 파일을 config/company_profile.json 에 덮어쓰면 다음 스캔에 반영됩니다.', '저장됨'); return; }
+    if (saving) return; saving = true; $('#save').disabled = true; setStatus('저장 중…');
+    const d = collect();
+    try { await ref.set(d); last = d; dirty = false; $('#saved').textContent = d.updated_at; $('#meta').textContent = d.company_name + ' · 기준일 ' + d.updated_at; setStatus('다음 주 스캔부터 반영됩니다.', '저장됨'); }
+    catch (e) { setStatus((e && e.code === 'invalid_argument') ? '저장 권한이 없습니다 (편집 권한 필요).' : '저장 실패: ' + (e && e.message ? e.message : e), '오류'); }
+    finally { saving = false; $('#save').disabled = false; }
+  });
+
+  setStatus('기본값을 표시 중입니다. 저장본을 불러오는 중…');
+  const boot = async () => {
+    const local = () => { mode = 'local'; $('#dl').hidden = false; const saved = lsLoad(); if (saved) { last = saved; fill(saved); setStatus('이 브라우저에 저장된 값을 불러왔습니다.', '로컬'); } else setStatus('config/company_profile.json 의 값을 표시 중입니다. 수정 후 저장·내려받기.', '로컬'); };
+    if (!(window.claude && typeof window.claude.use === 'function')) { local(); return; }
+    db = await window.claude.use('db');
+    if (!db) { local(); return; }
+    ref = db.doc('profile/company');
+    unsub = ref.onSnapshot((snap) => {
+      if (snap.metadata && snap.metadata.hasPendingWrites) return;
+      if (!snap.exists) { setStatus('아직 저장본이 없습니다. 내용을 확인하고 저장하세요.', '기본값'); return; }
+      const d = snap.data(); last = d;
+      if (dirty) { setStatus('다른 곳에서 저장된 최신본이 있습니다. "되돌리기"로 불러올 수 있습니다.', '주의'); return; }
+      fill(d); setStatus('저장본을 불러왔습니다.', '연결됨');
+    }, (e) => { setStatus('저장소 연결이 끊겼습니다: ' + (e && e.code ? e.code : ''), '오류'); });
+  };
+  boot();
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+})();
+</script>
+`;
+fs.mkdirSync(path.join(ROOT, "reports"), { recursive: true });
+const out = path.join(ROOT, "reports", "conditions.html");
+fs.writeFileSync(out, html, "utf8");
+console.log("생성 완료:", out);
