@@ -88,6 +88,9 @@ table.plan td.t{color:var(--ink);width:70%} table.plan td.d{white-space:nowrap;f
 .internal details summary::-webkit-details-marker{display:none}
 .internal details summary::before{content:"▸";font-size:12px;color:var(--muted)} .internal details[open] summary::before{content:"▾"}
 .internal details summary h2::after{display:none}
+.pdfopts{display:inline-flex;gap:10px;align-items:center;font-size:12px;color:var(--muted);font-family:var(--label);padding:0 6px;border-left:1px solid var(--line)}
+.pdfopts label{display:inline-flex;gap:4px;align-items:center;cursor:pointer;color:var(--ink-2);white-space:nowrap}
+.pdfopts input{margin:0;accent-color:var(--ink)}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
 .hist-week{font-family:var(--mono);font-size:12px;white-space:nowrap}
 .st{display:inline-block;font-family:var(--label);font-size:11.5px;padding:2px 7px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
@@ -244,6 +247,7 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     <div class="toolbar">
       <button class="btn primary" id="exp-xlsx" type="button">엑셀 내보내기 (.xlsx)</button>
       <button class="btn" id="exp-pdf" type="button">PDF로 출력</button>
+      <span class="pdfopts" title="PDF에 포함할 항목"><span>PDF 포함:</span><label><input type="checkbox" id="pdf-sum" checked>핵심 요약</label><label><input type="checkbox" id="pdf-op" checked>종합 의견</label><label><input type="checkbox" id="pdf-plan">향후 계획</label></span>
       <button class="btn" id="exp-csv" type="button">CSV 내보내기</button>
       <button class="btn" id="copy" type="button">추천 목록 복사</button>
       <a class="btn" id="xlsx" href="#" download hidden>저장된 엑셀 열기</a>
@@ -558,7 +562,8 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
   }
   const HEAD_ALL = ['No', '분야', '공고명', '주관기관', '지역', '마감일', '신청 가능', '가능 여부 근거', '판정', '적합도', '점수', '판정 사유', '원문 링크'];
 
-  function buildPaper(w){
+  function buildPaper(w, opts){
+    opts = opts || { sum: true, op: true, plan: false };
     const items = w.items || [];
     const recs = items.filter(isRec).sort(byScore).filter(it => { const d = decisions[decKey(it)]; return !(d && d.decision === 'declined'); });
     const cnt = (f) => items.filter(f).length;
@@ -567,14 +572,16 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     const li = (arr) => arr.map(s => '<li>' + esc(s) + '</li>').join('');
     const steps = Array.isArray(w.next_steps) ? w.next_steps : [];
     const idx = weeks.length - weeks.indexOf(w);
+    const cols = [];
+    if (opts.sum) cols.push('<div class="col"><h3>핵심 요약</h3><ul class="p">' + li(sp(w.summary_points, w.summary)) + '</ul></div>');
+    if (opts.op) cols.push('<div class="col"><h3>종합 의견</h3><ol class="p">' + li(sp(w.opinion_points, w.conclusion)) + '</ol></div>');
+    if (opts.plan) cols.push('<div class="col"><h3>향후 계획</h3><table class="pl"><thead><tr><th>할 일</th><th>담당</th><th>기한</th></tr></thead><tbody>' + (steps.length ? steps.map(s => { const o = typeof s === 'string' ? { task: s } : s; return '<tr><td>' + esc(o.task || '') + '</td><td>' + esc(o.owner || '-') + '</td><td class="d">' + esc(o.due || '-') + '</td></tr>'; }).join('') : '<tr><td colspan="3">-</td></tr>') + '</tbody></table></div>');
+    const sumBlock = cols.length ? '<h2>금주 요약</h2><div class="cols" style="grid-template-columns:repeat(' + cols.length + ',1fr)">' + cols.join('') + '</div>' : '';
     let h = '<div class="mast"><div><h1>지원사업 주간 검토</h1><div class="sub">' + esc(profile.company_name) + ' · ' + esc(profile.industry) + ' · ' + esc(profile.location) + ' ' + esc(profile.district || '') + ' · ' + esc(profile.employees) + '명 · ' + esc(profile.founded_year) + '년 설립</div></div>' +
       '<div class="right"><b>' + esc(w.report_date) + '</b>제' + idx + '호 · ' + esc(profile.department || '') + '</div></div>' +
       '<div class="dateline"><span>검토기간 ' + esc(w.period || '') + '</span><span>출처 ' + esc(w.source || '') + '</span></div>' +
       '<div class="kp"><div><div class="l">검토 공고</div><div class="v">' + items.length + '<small>건</small></div></div><div class="hi"><div class="l">추천</div><div class="v">' + cnt(i => i.recommend === '추천') + '<small>건</small></div></div><div><div class="l">검토 대상</div><div class="v">' + cnt(i => i.recommend === '검토') + '<small>건</small></div></div><div><div class="l">제외</div><div class="v">' + cnt(i => !isRec(i)) + '<small>건</small></div></div><div><div class="l">신청 가능 · 확인 필요 · 불가</div><div class="v" style="font-size:19px">' + cnt(i => i.eligible === '가능') + ' <small>·</small> ' + cnt(i => i.eligible === '확인 필요') + ' <small>·</small> ' + cnt(i => i.eligible === '불가') + '</div></div></div>' +
-      '<h2>금주 요약</h2><div class="cols">' +
-      '<div class="col"><h3>핵심 요약</h3><ul class="p">' + li(sp(w.summary_points, w.summary)) + '</ul></div>' +
-      '<div class="col"><h3>종합 의견</h3><ol class="p">' + li(sp(w.opinion_points, w.conclusion)) + '</ol></div>' +
-      '</div>' +
+      sumBlock +
       '<h2>추천 · 검토 공고 ' + recs.length + '건' + (items.filter(isRec).length !== recs.length ? ' <span style="font-weight:400;color:#666">(신청 안 함 ' + (items.filter(isRec).length - recs.length) + '건 제외)</span>' : '') + '</h2>';
     if (!recs.length) h += '<div style="padding:20px;border:1px dashed #cfcfcf;color:#666;text-align:center">금주 추천·검토 대상 공고가 없습니다.</div>';
     recs.forEach((it, i) => {
@@ -603,7 +610,7 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     btn.disabled = true; status('PDF 생성 중… (수 초 소요)');
     const paper = $('#paper');
     try {
-      paper.innerHTML = buildPaper(w);
+      paper.innerHTML = buildPaper(w, { sum: $('#pdf-sum').checked, op: $('#pdf-op').checked, plan: $('#pdf-plan').checked });
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
       const canvas = await html2canvas(paper, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 1040 });
       const { jsPDF } = window.jspdf;
