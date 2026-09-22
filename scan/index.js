@@ -40,11 +40,13 @@ for (const f of fs.readdirSync(path.join(ROOT, "data")).filter((f) => /^\d{4}-\d
   const d = f.slice(0, 10);
   if (d >= cutoff.toISOString().slice(0, 10) && d < today) {
     const w = JSON.parse(fs.readFileSync(path.join(ROOT, "data", f), "utf8"));
-    (w.items || []).forEach((it) => { if (it.url) previous.set(norm(it.url), { recommend: it.recommend, deadline: it.deadline, week: d }); });
+    (w.items || []).forEach((it) => { if (it.url) previous.set(norm(it.url), { recommend: it.recommend, deadline: it.deadline, week: d, item: it }); });
   }
 }
 const todayD = new Date(today);
-const isReminder = (p) => { if (!p || !/추천|검토/.test(p.recommend || "")) return false; const dl = toDate(p.deadline); return dl && (dl - todayD) / 86400000 <= 14 && dl >= todayD; };
+const decidedUrls = new Set([...(decisions.applied || []), ...(decisions.declined || [])].map((d) => norm(d.url)));
+// 이월: 지난 보고에서 추천·검토였고 결정이 없으며 마감 전인 공고는 다시 포함 (이전 분석 재사용)
+const isCarry = (p) => { if (!p || !/^(추천|검토)$/.test(p.recommend || "")) return false; if (decidedUrls.has(norm(p.item.url))) return false; const dl = toDate(p.deadline); return !dl || dl >= todayD; };
 
 (async () => {
   // 3) 목록 수집
@@ -60,16 +62,20 @@ const isReminder = (p) => { if (!p || !/추천|검토/.test(p.recommend || "")) 
     if (excl.some((k) => (c.title || "").includes(k)) && !/바우처/.test(c.title || "")) { stats.keyword_out++; continue; }
     if (appliedUrls.has(norm(c.url))) { stats.applied_skipped++; continue; }
     const p = previous.get(norm(c.url));
-    if (p && !isReminder(p)) { stats.duplicate_out++; continue; }
-    if (p) c.reminder = `마감 임박 재안내 (${p.week} 보고)`;
+    if (p && !isCarry(p)) { stats.duplicate_out++; continue; }
+    if (p) { c.carried_from = p.item.carried_from || p.week; c.previous = p.item; }
     kept.push(c);
   }
+  const inKept = new Set(kept.map((c) => norm(c.url)));
+  for (const [url, p] of previous) if (!inKept.has(url) && isCarry(p)) { const it = p.item; kept.push({ id: "prev-" + Buffer.from(url).toString("base64url").slice(0, 12), title: it.title, category: it.category, region: it.region, agency: it.agency, period: it.period, url: it.url, carried_from: it.carried_from || p.week, previous: it, listed: false }); }
+  stats.carried = kept.filter((c) => c.carried_from).length;
   log(`코드 필터: 지역 ${stats.region_out}, 키워드 ${stats.keyword_out}, 기신청 ${stats.applied_skipped}, 최근 보고 중복 ${stats.duplicate_out} 제외 → ${kept.length}건`);
   fs.mkdirSync(path.join(ROOT, "data", "_candidates"), { recursive: true });
   if (DRY) { fs.writeFileSync(path.join(ROOT, "data", "_candidates", `${today}.json`), JSON.stringify({ stats, candidates: kept }, null, 2)); log(`dry-run: ${kept.length}건을 data/_candidates/${today}.json 에 저장하고 종료 (API 호출 없음)`); return; }
 
   // 5) API 1단계: 목록 정보로 명백한 제외 걸러내기
-  const tri = await triage(kept, profile, log);
+  const tri = await triage(kept.filter((c) => !c.carried_from), profile, log);
+  kept.filter((c) => c.carried_from).forEach((c) => tri.set(c.id, { keep: true, reason: "" })); // 이월 항목은 triage 생략
   const survivors = kept.filter((c) => tri.get(c.id).keep);
   const dropped = kept.filter((c) => !tri.get(c.id).keep);
   stats.triage_out = dropped.length;
@@ -80,7 +86,7 @@ const isReminder = (p) => { if (!p || !/추천|검토/.test(p.recommend || "")) 
   const overflow = survivors.slice(MAX_DETAIL);
   const detailed = await fetchDetails(site, target, log);
   const candidates = detailed.map((c) => ({
-    id: c.id, title: c.title, category: c.category, region: c.region, agency: c.agency, period: c.period, url: c.url, reminder: c.reminder,
+    id: c.id, title: c.title, category: c.category, region: c.region, agency: c.agency, period: c.period, url: c.url, carried_from: c.carried_from, previous: c.previous,
     detail: c.detail ? { region: c.detail.region, target: c.detail.target, operator: c.detail.operator, body: (c.detail.body_excerpt || "").slice(0, BODY_CHARS) } : null,
   }));
   stats.detail_analyzed = candidates.length;
