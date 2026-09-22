@@ -11,8 +11,9 @@
 config/company_profile.json  ─┐
 data/decisions.json (신청함/안함) ─┤
                                  ▼
- [수집] scan/fetch.js ──▶ [1차 필터] ──▶ [상세 수집] ──▶ [분석] scan/analyze.js (Claude)
-   목록 21페이지               지역·키워드·기신청       자격요건 본문           가능/불가 판정 · 점수 · 의견
+ [수집] fetch.js ─▶ [코드 필터] ─▶ [API 1단계 triage] ─▶ [상세 수집] ─▶ [API 2단계 분석]
+   목록 21페이지      지역·키워드·기신청    목록 정보만으로       살아남은 후보만     자격 판정 · 점수 · 의견
+                     ·최근 4주 중복        명백한 제외 걸러냄    (기본 40건 상한)    (analyze.js, Claude)
                                                                       │
                                                                       ▼
                                               data/YYYY-MM-DD.json ──▶ scripts/export_excel.js ──▶ reports/YYMMDD_지원사업검토내역.xlsx
@@ -87,15 +88,24 @@ npm run weekly                  # 수집 → 분석 → 엑셀 → 대시보드 
 ```
 config/   company_profile.json (회사 조건) · site.json (사이트 어댑터)
 scan/     index.js (파이프라인) · fetch.js (수집) · analyze.js (Claude 분석)
-prompts/  analyst.md (분석 지시서)
+prompts/  triage.md (1단계 걸러내기) · analyst.md (2단계 분석 지시서)
 scripts/  export_excel.js · build_site.js · build_conditions.js · sync_decisions.js · sync_profile.js
 data/     YYYY-MM-DD.json (주차 결과) · decisions.json (신청 이력) · SCHEMA.md · sample/
 reports/  index.html · conditions.html · YYMMDD_지원사업검토내역.xlsx
 ```
 
-## 비용 메모
+## 토큰·비용 설계
 
-후보 100~150건을 한 번에 분석하면 요청당 입력 10만 토큰 안팎입니다. 시스템 프롬프트는 캐시되고, `GRANT_SCOUT_MAX_DETAIL`로 상세 확인 건수를 줄이면 비용이 비례해 내려갑니다. 모델은 `GRANT_SCOUT_MODEL`로 바꿀 수 있습니다.
+한 번에 전부 보내지 않고 단계마다 입력을 줄입니다.
+
+| 단계 | 입력 | 출력 | 비고 |
+|---|---|---|---|
+| 코드 필터 | 0 | 0 | 지역·제외 키워드·기신청·최근 4주 중복(URL 기준)을 코드로 제거 |
+| API 1단계 triage | 후보당 ~60토큰 (id·공고명·분야·지역·기관·기간 한 줄) | 후보당 ~20토큰 | 명백한 제외만 판정, effort medium. `GRANT_SCOUT_TRIAGE_MODEL`로 더 싼 모델 지정 가능 |
+| 상세 수집 | 0 | 0 | 살아남은 후보만, `GRANT_SCOUT_MAX_DETAIL`(기본 40) 상한 |
+| API 2단계 분석 | 후보당 ~400토큰 (본문 900자) | 추천·검토는 상세, 제외는 한 줄 | effort high. 시스템 프롬프트는 캐시 |
+
+기본 설정에서 주당 대략 입력 3~4만, 출력 1~2만 토큰 수준입니다. 회사 재무 수치는 API로 보내지 않습니다(`finance.notes`의 판단 힌트만 전달).
 
 ## 라이선스
 
