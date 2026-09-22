@@ -84,6 +84,10 @@ table.plan th{padding:6px 6px;font-size:11.5px}
 table.plan td{padding:8px 6px;vertical-align:top;color:var(--ink-2);border-bottom:1px solid var(--line)}
 table.plan tr:last-child td{border-bottom:0}
 table.plan td.t{color:var(--ink);width:70%} table.plan td.d{white-space:nowrap;font-family:var(--mono);font-size:12px} table.plan td.o{white-space:nowrap;font-size:12px}
+.internal details summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+.internal details summary::-webkit-details-marker{display:none}
+.internal details summary::before{content:"▸";font-size:12px;color:var(--muted)} .internal details[open] summary::before{content:"▾"}
+.internal details summary h2::after{display:none}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
 .hist-week{font-family:var(--mono);font-size:12px;white-space:nowrap}
 .st{display:inline-block;font-family:var(--label);font-size:11.5px;padding:2px 7px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
@@ -176,7 +180,7 @@ td.decc{min-width:210px}
 #paper .kp .hi{background:#111} #paper .kp .hi .l,#paper .kp .hi .v,#paper .kp .hi small{color:#fff}
 #paper h2{font-size:12.5px;font-weight:700;margin:22px 0 10px;display:flex;align-items:center;gap:10px;color:#111}
 #paper h2::after{content:"";flex:1;height:1px;background:#cfcfcf}
-#paper .cols{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:0}
+#paper .cols{display:grid;grid-template-columns:1.1fr 1fr;gap:0}
 #paper .col{padding:0 16px;border-right:1px solid #cfcfcf} #paper .col:first-child{padding-left:0} #paper .col:last-child{border-right:0;padding-right:0}
 #paper .col h3{font-family:var(--display);font-size:15px;font-weight:600;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #111}
 #paper ul.p,#paper ol.p{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;color:#333;font-size:12.5px;line-height:1.55}
@@ -210,7 +214,7 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
 }
 @media print{
   body{padding:0;font-size:12px} .weeks,.actions,.filters,.seg,.status,footer{display:none!important}
-  .frame{break-inside:avoid;margin-bottom:12px} .tablewrap{overflow:visible} table.grid.wide{min-width:0}
+  .internal{display:none!important} .frame{break-inside:avoid;margin-bottom:12px} .tablewrap{overflow:visible} table.grid.wide{min-width:0}
 }
 </style>
 
@@ -235,7 +239,6 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     <div class="sumgrid">
       <div class="card tint"><h3>핵심 요약</h3><ul class="pts lead" id="summary"></ul></div>
       <div class="card"><h3>종합 의견</h3><ol class="pts" id="opinion"></ol></div>
-      <div class="card wide"><h3>향후 계획 <small>담당 · 기한</small></h3><table class="plan" id="plan"><thead><tr><th>할 일</th><th>담당</th><th>기한</th></tr></thead><tbody></tbody></table></div>
     </div>
     <div class="insights" id="insights" hidden></div>
     <div class="toolbar">
@@ -264,6 +267,13 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
         <tbody></tbody>
       </table>
     </div>
+  </section>
+
+  <section class="internal" id="plan-section">
+    <details>
+      <summary><h2 style="display:inline-flex;margin:0;width:auto">향후 계획 <span style="color:var(--muted);font-weight:400">내부용 · PDF·엑셀에는 포함되지 않음</span></h2></summary>
+      <div class="card" style="margin-top:10px"><table class="plan" id="plan"><thead><tr><th>할 일</th><th>담당</th><th>기한</th></tr></thead><tbody></tbody></table></div>
+    </details>
   </section>
 
   <section>
@@ -564,7 +574,7 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
       '<h2>금주 요약</h2><div class="cols">' +
       '<div class="col"><h3>핵심 요약</h3><ul class="p">' + li(sp(w.summary_points, w.summary)) + '</ul></div>' +
       '<div class="col"><h3>종합 의견</h3><ol class="p">' + li(sp(w.opinion_points, w.conclusion)) + '</ol></div>' +
-      '<div class="col"><h3>향후 계획</h3><table class="pl"><thead><tr><th>할 일</th><th>담당</th><th>기한</th></tr></thead><tbody>' + (steps.length ? steps.map(s => { const o = typeof s === 'string' ? { task: s } : s; return '<tr><td>' + esc(o.task || '') + '</td><td>' + esc(o.owner || '-') + '</td><td class="d">' + esc(o.due || '-') + '</td></tr>'; }).join('') : '<tr><td colspan="3">-</td></tr>') + '</tbody></table></div></div>' +
+      '</div>' +
       '<h2>추천 · 검토 공고 ' + recs.length + '건' + (items.filter(isRec).length !== recs.length ? ' <span style="font-weight:400;color:#666">(신청 안 함 ' + (items.filter(isRec).length - recs.length) + '건 제외)</span>' : '') + '</h2>';
     if (!recs.length) h += '<div style="padding:20px;border:1px dashed #cfcfcf;color:#666;text-align:center">금주 추천·검토 대상 공고가 없습니다.</div>';
     recs.forEach((it, i) => {
@@ -657,12 +667,12 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
       prof.forEach(v => { const row = s.getRow(r++); row.values = v; [1, 3].forEach(c => { row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; row.getCell(c).font = { bold: true, size: 10 }; }); body(row); });
       s.mergeCells('B' + (r - 1) + ':D' + (r - 1)); s.getRow(r - 1).height = 48; r++;
       s.getCell('A' + r).value = '2. 금주 핵심 요약'; s.getCell('A' + r).font = { bold: true, size: 12 }; r++;
-      s.mergeCells('A' + r + ':D' + r); s.getCell('A' + r).value = w.summary || ''; s.getCell('A' + r).alignment = WRAP; s.getCell('A' + r).border = B; s.getRow(r).height = Math.max(60, Math.ceil((w.summary || '').length / 60) * 18); r += 2;
+      s.mergeCells('A' + r + ':D' + r); const sumTxt = (Array.isArray(w.summary_points) && w.summary_points.length) ? w.summary_points.map(x => '• ' + x).join(String.fromCharCode(10)) : (w.summary || ''); s.getCell('A' + r).value = sumTxt; s.getCell('A' + r).alignment = WRAP; s.getCell('A' + r).border = B; s.getRow(r).height = Math.max(60, (sumTxt.split(String.fromCharCode(10)).length + Math.ceil(sumTxt.length / 70)) * 16); r += 2;
       s.getCell('A' + r).value = '3. 추천 공고 목록 (우선순위순)'; s.getCell('A' + r).font = { bold: true, size: 12 }; r++;
       const h = s.getRow(r++); h.values = ['우선순위 / 적합도', '공고명', '마감일', '추진 의견']; hdr(h);
       recs.forEach((it, i) => { const row = s.getRow(r++); row.values = [(i + 1) + '순위 / ' + (it.fit || '-') + ' (' + (it.score ?? '-') + '점)', it.title, it.deadline || '-', it.opinion || '']; body(row); const f = fitFill(it.fit); if (f) row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: f } }; });
-      r++; s.getCell('A' + r).value = '4. 종합 의견 및 향후 계획'; s.getCell('A' + r).font = { bold: true, size: 12 }; r++;
-      s.mergeCells('A' + r + ':D' + r); s.getCell('A' + r).value = w.conclusion || ''; s.getCell('A' + r).alignment = WRAP; s.getCell('A' + r).border = B; s.getRow(r).height = Math.max(60, Math.ceil((w.conclusion || '').length / 60) * 18);
+      r++; s.getCell('A' + r).value = '4. 종합 의견'; s.getCell('A' + r).font = { bold: true, size: 12 }; r++;
+      s.mergeCells('A' + r + ':D' + r); const opTxt = (Array.isArray(w.opinion_points) && w.opinion_points.length) ? w.opinion_points.map((x, i) => (i + 1) + ') ' + x).join(String.fromCharCode(10)) : (w.conclusion || ''); s.getCell('A' + r).value = opTxt; s.getCell('A' + r).alignment = WRAP; s.getCell('A' + r).border = B; s.getRow(r).height = Math.max(60, (opTxt.split(String.fromCharCode(10)).length + Math.ceil(opTxt.length / 70)) * 16);
       s.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
 
       // 2. 타당성 분석

@@ -16,10 +16,8 @@ const profile = JSON.parse(fs.readFileSync(path.join(ROOT, "config", "company_pr
 const reportDate = data.report_date || new Date().toISOString().slice(0, 10);
 const summaryText = Array.isArray(data.summary_points) && data.summary_points.length ? data.summary_points.map((s) => "• " + s).join("\n") : data.summary || "";
 const stepLine = (s) => (typeof s === "string" ? s : `${s.task || ""}${s.owner ? " (담당: " + s.owner + ")" : ""}${s.due ? " [기한: " + s.due + "]" : ""}`);
-const conclusionText = [
-  Array.isArray(data.opinion_points) && data.opinion_points.length ? data.opinion_points.map((s, i) => `${i + 1}) ${s}`).join("\n") : data.conclusion || "",
-  Array.isArray(data.next_steps) && data.next_steps.length ? "\n[향후 계획]\n" + data.next_steps.map((s, i) => `${i + 1}. ${stepLine(s)}`).join("\n") : "",
-].join("\n").trim();
+// 향후 계획(next_steps)은 내부용이라 보고서에 넣지 않는다.
+const conclusionText = (Array.isArray(data.opinion_points) && data.opinion_points.length ? data.opinion_points.map((s, i) => `${i + 1}) ${s}`).join("\n") : data.conclusion || "").trim();
 const items = data.items || [];
 const recommended = items.filter((i) => i.recommend === "추천" || i.recommend === "검토");
 const excluded = items.filter((i) => !(i.recommend === "추천" || i.recommend === "검토"));
@@ -172,7 +170,7 @@ function fitColor(fit) {
   }
 
   r++;
-  ws.getCell(`A${r}`).value = "4. 종합 의견 및 향후 계획";
+  ws.getCell(`A${r}`).value = "4. 종합 의견";
   ws.getCell(`A${r}`).font = { bold: true, size: 12 };
   r++;
   ws.mergeCells(`A${r}:D${r}`);
