@@ -274,6 +274,16 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
     </div>
   </section>
 
+  <section id="applied-section">
+    <h2>신청한 공고 <span id="appcount" style="color:var(--ink)"></span> <span style="color:var(--muted);font-weight:400">신청함으로 표시한 공고 · 전체 주차 · 다음 주부터 같은 공고는 목록에서 제외</span></h2>
+    <div class="tablewrap">
+      <table class="grid" id="applied">
+        <thead><tr><th>주차</th><th>판정</th><th>공고명 / 기관</th><th>마감</th><th>상태</th><th>점수</th><th>지원내용</th><th>신청일</th><th>조건 확인 · 취소</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="declined-section">
     <h2>추천에서 뺀 공고 <span id="declcount" style="color:var(--ink)"></span> <span style="color:var(--muted);font-weight:400">신청 안 함으로 표시한 공고 · 전체 주차</span></h2>
     <div class="tablewrap">
@@ -282,7 +292,6 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
         <tbody></tbody>
       </table>
     </div>
-    <div class="sub" id="applied-list" style="margin-top:10px;font-size:12.5px;color:var(--muted)"></div>
   </section>
 
   <section class="internal" id="plan-section">
@@ -456,7 +465,7 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
       el.innerHTML =
         '<div class="head"><div class="rank' + (it.recommend === '검토' ? ' rv' : '') + '"><b>' + (i + 1) + '</b><span>' + esc(it.recommend) + '</span></div>' +
         '<div class="ttl"><div class="name">' + esc(it.title) + '</div>' +
-        '<div class="tags"><span>' + esc(it.agency || '') + '</span><span>' + esc(it.category || '') + '</span><span>' + esc(it.region || '') + '</span><span>마감 ' + esc(it.deadline || '-') + '</span>' + fitHtml(it.fit) + '<span>' + esc(it.score ?? '-') + '점</span>' + elHtml(it.eligible) + '</div></div></div>' +
+        '<div class="tags"><span>' + esc(it.agency || '') + '</span><span>' + esc(it.category || '') + '</span><span>' + esc(it.region || '') + '</span><span>마감 ' + esc(it.deadline || '-') + '</span>' + fitHtml(it.fit) + '<span>' + esc(it.score ?? '-') + '점</span>' + elHtml(it.eligible) + (it.carried_from ? '<span class="rec" style="border-style:dashed">이월 · 최초 ' + esc(it.carried_from) + '</span>' : '') + '</div></div></div>' +
         '<table class="kv"><tbody>' +
         '<tr class="sec"><th>공고 개요</th><td>접수기간 ' + esc(it.period || it.deadline || '-') + '</td></tr>' +
         '<tr><th>지원내용 · 규모</th><td>' + esc(it.support || '-') + '</td></tr>' +
@@ -482,7 +491,7 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
       const a = it.analysis || {};
       const tr = document.createElement('tr');
       tr.innerHTML = '<td class="num">' + (i + 1) + '</td><td>' + recHtml(it.recommend) + '</td>' +
-        '<td class="title">' + esc(it.title) + '<div class="sub">' + esc(it.agency || '') + '</div></td>' +
+        '<td class="title">' + esc(it.title) + (it.carried_from ? ' <span class="rec" style="border-style:dashed;font-weight:400">이월</span>' : '') + '<div class="sub">' + esc(it.agency || '') + '</div></td>' +
         '<td>' + esc(it.category || '') + '</td><td class="num">' + esc(it.period || '-') + '</td><td class="num">' + esc(it.deadline || '-') + '</td>' +
         '<td class="long">' + esc(it.support || '') + '</td><td class="long">' + esc(it.eligibility || '') + '</td>' +
         '<td>' + elHtml(it.eligible) + (it.eligible_reason ? '<div class="sub" style="font-size:11.5px;color:var(--muted);white-space:normal;min-width:160px">' + esc(it.eligible_reason) + '</div>' : '') + '</td>' +
@@ -517,7 +526,19 @@ footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-fa
       keyIndex[decKey(it)] = it;
       tb.appendChild(tr);
     });
-    $('#applied-list').innerHTML = applied.length ? '<b style="color:var(--ink)">신청 완료 ' + applied.length + '건</b> (다음 주부터 같은 공고는 목록에서 제외): ' + applied.map(x => esc(x.it.title) + ' <span style="font-family:var(--mono)">' + esc(x.d.decided_at) + '</span>').join(' · ') : '';
+    $('#appcount').textContent = applied.length ? '· ' + applied.length + '건' : '';
+    const ab = $('#applied tbody'); ab.innerHTML = '';
+    if (!applied.length) ab.innerHTML = '<tr><td colspan="9"><div class="empty">신청함으로 표시한 공고가 없습니다. 신청을 마친 공고에서 "신청함"을 누르면 여기로 모입니다.</div></td></tr>';
+    applied.forEach(({ it, d, week }) => {
+      const st = deadlineState(it.deadline);
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td class="hist-week">' + esc(week) + '</td><td>' + recHtml(it.recommend) + '</td>' +
+        '<td class="title">' + esc(it.title) + '<div class="sub">' + esc(it.agency || '') + '</div></td><td class="num">' + esc(it.deadline || '-') + '</td>' +
+        '<td><span class="st ' + st.cls + '">' + st.label + '</span></td><td class="num">' + esc(it.score ?? '-') + '</td><td class="long">' + esc(it.support || '') + '</td><td class="num">' + esc(d.decided_at || '') + '</td>' +
+        '<td class="decc"><div class="dec">' + (it.url ? '<a class="btn sm" href="' + esc(it.url) + '" target="_blank" rel="noopener">조건 확인 ↗</a>' : '') + (decAvail ? '<button type="button" class="btn sm" data-dec="clear" data-key="' + decKey(it) + '">신청 기록 취소</button>' : '') + '</div></td>';
+      keyIndex[decKey(it)] = it;
+      ab.appendChild(tr);
+    });
   }
 
   function deadlineState(d){
